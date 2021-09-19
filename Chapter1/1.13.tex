@@ -1,0 +1,100 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{titlesec}
+\usepackage{graphicx}
+\usepackage{mathtools}
+\usepackage{amsmath,amsthm,amssymb,scrextend}
+\usepackage[top=1.0in,bottom=1.0in]{geometry}
+\usepackage{enumitem}
+
+\usepackage{gensymb}
+
+\begin{document}
+
+\title{SICP\\ Solution to Exercise 1.13}
+\author{Felipe Peressim}
+
+\date{}
+\maketitle
+
+\textbf{Exercise 1.13:} Prove that $\operatorname{Fib}(n)$ is the closest integer to $\varphi^{n}/\sqrt{5}$, where $\varphi=(1+\sqrt{5})/2$.
+Hint: Let $\psi=(1-\sqrt{5})/2$. Use induction and the definition of the Fibonacci numbers (see 1.2.2)
+to prove that $\operatorname{Fib}(n)=(\varphi^{n}-\psi^{n})/\sqrt{5}$.\\ \\
+
+\begin{proof}
+  We use strong induction. Let $n \in \mathbb{N}$ be arbitrary, and suppose that for all $k < n$,
+
+ 
+  $$\operatorname{Fib}(k)=\frac{\left(\frac{1+\sqrt{5}}{2}\right)^{k}-\left(\frac{1-\sqrt{5}}{2}\right)^{k}}{\sqrt{5}}$$
+
+  If $n = 0$, then
+
+\begin{align*}
+  \frac{\left(\frac{1+\sqrt{5}}{2}\right)^{n}-\left(\frac{1-\sqrt{5}}{2}\right)^{n}}{\sqrt{5}}
+  &=\frac{\left(\frac{1+\sqrt{5}}{2}\right)^{0}-\left(\frac{1-\sqrt{5}}{2}\right)^{0}}{\sqrt{5}} \\
+  &=\frac{1-1}{\sqrt{5}}=0=\operatorname{Fib}(0).
+\end{align*}
+
+If $n = 1$, then
+
+\begin{align*}
+  \frac{\left(\frac{1+\sqrt{5}}{2}\right)^{n}-\left(\frac{1-\sqrt{5}}{2}\right)^{n}}{\sqrt{5}}
+  &=\frac{\left(\frac{1+\sqrt{5}}{2}\right)^{1}-\left(\frac{1-\sqrt{5}}{2}\right)^{1}}{\sqrt{5}} \\
+  &=\frac{\sqrt{5}}{\sqrt{5}}=1=\operatorname{Fib}(1).
+\end{align*}
+
+
+For $n \geq 2$, applying the inductive hypothesis to $n-2$ and $n-1$, we have
+
+
+\begin{align*}
+  \operatorname{Fib}(n) &= \operatorname{Fib}(n-2) + \operatorname{Fib}(n-1)\\
+  &=\frac{\left(\frac{1+\sqrt{5}}{2}\right)^{n-2} - \left(\frac{1-\sqrt{5}}{2}\right)^{n-2}}{\sqrt{5}} +
+    \frac{\left(\frac{1+\sqrt{5}}{2}\right)^{n-1} - \left(\frac{1-\sqrt{5}}{2}\right)^{n-1}}{\sqrt{5}}\\
+\end{align*}
+\begin{align*}
+  &=\frac{\left(\frac{1+\sqrt{5}}{2}\right)^{n-2}+\left(\frac{1+\sqrt{5}}{2}\right)^{n-1} -
+    \left(\frac{1-\sqrt{5}}{2}\right)^{n-2}-\left(\frac{1-\sqrt{5}}{2}\right)^{n-1}}{\sqrt{5}}\\
+  &= \frac{\left(\frac{1+\sqrt{5}}{2}\right)^{n-2}\left(1+\frac{1+\sqrt{5}}{2}\right)-\left(\frac{1-\sqrt{5}}{2}\right)^{n-2}\left(1+\frac{1-\sqrt{5}}{2}\right)}{\sqrt{5}}
+\end{align*}
+
+Since $\left(\frac{1+\sqrt{5}}{2}\right)^{2}=\frac{3+\sqrt{5}}{2}=1+\frac{1+\sqrt{5}}{2}$
+
+and similarly $\left(\frac{1-\sqrt{5}}{2}\right)^{2}=\frac{3-\sqrt{5}}{2}=1+\frac{1-\sqrt{5}}{2}$.\\
+
+Substituting into the formula for $\operatorname{Fib}(n)$ yields
+
+\begin{align*}
+  \operatorname{Fib}(n)&=\frac{\left(\frac{1+\sqrt{5}}{2}\right)^{n-2}\left(\frac{1+\sqrt{5}}{2}\right)^{2}-\left(\frac{1-\sqrt{5}}{2}\right)^{n-2}\left(\frac{1-\sqrt{5}}{2}\right)^{2}}{\sqrt{5}}\\
+  &=\frac{\left(\frac{1+\sqrt{5}}{2}\right)^{n}-\left(\frac{1-\sqrt{5}}{2}\right)^{n}}{\sqrt{5}}
+\end{align*}
+
+Therefore, Fib($n$)$=(\varphi^{n}-\psi^{n})/\sqrt{5}$ as required.
+
+\end{proof}
+
+Now, we will prove that Fib($n$) is the closest integer to $\varphi^{n}/\sqrt{5}$.\\
+
+\begin{proof}
+
+  Since $\operatorname{Fib}(n)=\frac{(\varphi^{n}-\psi^{n})}{\sqrt{5}}$, it can be rewritten as
+
+  $$\frac{\varphi^{n}}{\sqrt{5}} = \operatorname{Fib}(n) + \frac{\psi^{n}}{\sqrt{5}}$$
+
+  Note that, since $\left|\frac{\psi}{\sqrt{5}}\right| < \frac{1}{2}$, it follows that $\left|\frac{\psi^{n}}{\sqrt{5}}\right| < \left|\frac{\psi}{\sqrt{5}}\right| < \frac{1}{2}$, and
+  therefore $-\frac{1}{2} < \frac{\psi^{n}}{\sqrt{5}} < \frac{1}{2}$.\\
+
+  Now adding $\operatorname{Fib}(n)$ to the inequality $-\frac{1}{2} < \frac{\psi^{n}}{\sqrt{5}} < \frac{1}{2}$ gives
+
+  $$\operatorname{Fib}(n) -\frac{1}{2} < \operatorname{Fib}(n) + \frac{\psi^{n}}{\sqrt{5}} < \operatorname{Fib}(n) + \frac{1}{2}$$.
+
+  Since $\frac{\varphi^{n}}{\sqrt{5}} = \operatorname{Fib}(n) + \frac{\psi^{n}}{\sqrt{5}}$, then
+
+  $$\operatorname{Fib}(n) -\frac{1}{2} < \frac{\varphi^{n}}{\sqrt{5}} < \operatorname{Fib}(n) + \frac{1}{2}$$.
+
+  Which shows that $\operatorname{Fib}(n)$ is the closest integer to $\varphi^{n}/\sqrt{5}$.
+  
+\end{proof}
+
+\end{document}
