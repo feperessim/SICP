@@ -1,6 +1,5 @@
 #lang SICP
 
-
 ;; Iterative product procedure
 
 (define (product term a next b)
