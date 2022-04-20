@@ -5,7 +5,7 @@
      (lambda (arg) (make-rational arg 1)))
 
 (put 'raise 'rational
-     (lambda (arg) (make-real (/ (number arg) (denom arg)))))
+     (lambda (arg) (make-real (/ (numer arg) (denom arg)))))
 
 (put 'raise 'real
      (lambda (arg) (make-from-real-imag arg 0)))
