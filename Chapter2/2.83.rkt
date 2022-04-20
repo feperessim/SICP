@@ -9,5 +9,3 @@
 
 (put 'raise 'real
      (lambda (arg) (make-from-real-imag arg 0)))
-     
-
