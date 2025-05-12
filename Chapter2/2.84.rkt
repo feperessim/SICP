@@ -1,3 +1,8 @@
+;;#lang racket
+;;(provide (all-defined-out))
+
+(define (square x) (* x x))
+
 ;; Data directed programming - Tagged data
 (define (attach-tag type-tag contents)
   (cons type-tag contents))
@@ -77,6 +82,15 @@
          (tag (make-from-mag-ang r a))))
   'done)
 
+(define (real-part z) 
+  (apply-generic 'real-part z))
+(define (imag-part z) 
+  (apply-generic 'imag-part z))
+(define (magnitude z) 
+  (apply-generic 'magnitude z))
+(define (angle z) 
+  (apply-generic 'angle z))
+
 ;; Complex
 (define (install-complex-package)
   ;; imported procedures from rectangular 
@@ -106,6 +120,10 @@
      (/ (magnitude z1) (magnitude z2))
      (- (angle z1) (angle z2))))
   ;; interface to rest of the system
+  (put 'real-part '(complex) real-part)
+  (put 'imag-part '(complex) imag-part)
+  (put 'magnitude '(complex) magnitude)
+  (put 'angle '(complex) angle)
   (define (tag z) (attach-tag 'complex z))
   (put 'add '(complex complex)
        (lambda (z1 z2) 
@@ -263,23 +281,24 @@
 (define (coerce arg type)
   (if (eq? (type-tag arg) type)
       arg
-      (let ((proc (get 'raise (type-tag arg))))
-	(if proc
-	    (coerce (proc (contents arg)) type)
-	    #f))))
-
+      (let ((raised-arg (raise arg)))
+	(if (and raised-arg (eq? (type-tag arg) (type-tag raised-arg)))
+	    #f
+	    (if raised-arg
+		(coerce raised-arg type)
+		#f)))))
 
 (define (numer x) (car x))
 (define (denom x) (cdr x))
 
 ;; Put raise procs in the table
-(put 'raise 'integer
+(put 'raise '(integer)
      (lambda (arg) (make-rational arg 1)))
 
-(put 'raise 'rational
+(put 'raise '(rational)
      (lambda (arg) (make-real (/ (numer arg) (denom arg)))))
 
-(put 'raise 'real
+(put 'raise '(real)
      (lambda (arg) (make-complex-from-real-imag arg 0)))
 
 ;; Install numbers packages
@@ -296,23 +315,23 @@
 (put-type-level 'real 3)
 (put-type-level 'complex 4)
 
-
 (define (apply-generic op . args)
   (let ((type-tags (map type-tag args)))
     (let ((proc (get op type-tags)))
       (if proc
           (apply proc (map contents args))
-          (let ((highest-type-tag (highest-type type-tags)))
-            (let ((coerced-args 
-                   (map (lambda (obj) 
-                          (coerce obj highest-type-tag))
-                        args)))
-              (if (andmap identity coerced-args)
-                  (apply apply-generic 
-                         (cons op coerced-args))
-                  (error "Could not coerce args" 
-                         (list op type-tags)))))))))
-
+	  (if (eq? op 'raise)
+	      (car args)
+	      (let ((highest-type-tag (highest-type type-tags)))
+		(let ((coerced-args 
+		       (map (lambda (obj) 
+			      (coerce obj highest-type-tag))
+			    args)))
+		  (if (andmap identity coerced-args)
+		      (apply apply-generic 
+			     (cons op coerced-args))
+		      (error "Could not coerce args" 
+			     (list op type-tags))))))))))
 
 ;; Numbers
 (define (add x y) (apply-generic 'add x y))
