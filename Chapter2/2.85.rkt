@@ -312,23 +312,53 @@
 (put-type-level 'real 3)
 (put-type-level 'complex 4)
 
-(define (apply-generic op . args)
-  (let ((type-tags (map type-tag args)))
-    (let ((proc (get op type-tags)))
-      (if proc
-          (apply proc (map contents args))
-	  (if (null? (cdr args))
-	      (car args)
-	      (let ((highest-type-tag (highest-type type-tags)))
-		(let ((coerced-args 
-		       (map (lambda (obj) 
-			      (coerce obj highest-type-tag))
-			    args)))
-		  (if (andmap identity coerced-args)
-		      (apply apply-generic 
-			     (cons op coerced-args))
-		      (error "Could not coerce args" 
-			     (list op type-tags))))))))))
+(define (equ? x y)
+  (apply-generic 'equ? x y))
+
+;; Scheme-number package
+(put 'equ? '(scheme-number scheme-number) =)
+
+;; Rational package
+(put 'equ? '(rational rational)
+     (lambda (x y) (and (= (numer x) (numer y))
+			(= (denom x) (denom y)))))
+
+;; Complex package
+(put 'equ? '(complex complex)
+     (lambda (x y) (and (= (real-part x) (real-part y))
+			(= (imag-part x) (imag-part y)))))
+
+(put 'equ? '(real real) =)
+(put 'equ? '(integer integer) =)
+
+(define (project x) (apply-generic 'project x))
+
+(define (project-complex z)
+  (make-real (real-part z)))
+
+(define (project-real r)
+  (make-rational (round  r) 1))
+
+(define (project-rational r)
+  (make-integer (round (/ (numer r) (denom r)))))
+
+(put 'project '(complex) project-complex)
+(put 'project '(real) project-real)
+(put 'project '(rational) project-rational)
+
+;; Drop procedure
+(define (drop obj)
+  (let ((proj-proc (get 'project (list (type-tag obj)))))
+    (if proj-proc
+        (let ((projected-obj (proj-proc (contents obj))))
+          (if projected-obj
+              (let ((raised-back (raise projected-obj)))
+                (if (and raised-back (equ? obj raised-back))
+                    (drop projected-obj)  ; Recursively drop further
+                    obj))                 ; Can't drop, return original
+              obj))                       ; No projection possible
+        obj)))                            ; No project operation
+
 
 ;; Numbers
 (define (add x y) (apply-generic 'add x y))
@@ -336,42 +366,37 @@
 (define (mul x y) (apply-generic 'mul x y))
 (define (div x y) (apply-generic 'div x y))
 
-;; test cases
+;;  apply-generic with drop
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (let ((result (apply proc (map contents args))))
+            ;; Apply drop to simplify the result, but only for arithmetic operations
+            (if (memq op '(add sub mul div))
+                (drop result)
+                result))
+          ;; Coercion logic for when direct operation not found
+          (if (= (length args) 1)
+              (car args)  ; Single argument, return as-is
+              (let ((highest-type-tag (highest-type type-tags)))
+                (let ((coerced-args 
+                       (map (lambda (obj) (coerce obj highest-type-tag)) args)))
+                  (if (every identity coerced-args)
+                      (apply apply-generic (cons op coerced-args))
+                      (error "Could not coerce args" (list op type-tags))))))))))
+
+
+;; Test cases
 (define int (make-integer 3))
 (define rat (make-rational 3 2))
 (define real (make-real 2.5))
-(define complex  (make-complex-from-real-imag 2 1))
+(define complex-simple (make-complex-from-real-imag 2 0))  ; Can be dropped to real
+(define complex-full (make-complex-from-real-imag 2 1))    ; Cannot be dropped
 
-(display (add int int))
-(newline)
-(display (add int rat))
-(newline)
-(display (add int real))
-(newline)
-(display (add int complex))
-(newline)
-(display (add rat rat))
-(newline)
-(display (add rat real))
-(newline)
-(display (add rat complex))
-(newline)
-(display (add real real))
-(newline)
-(display (add real complex))
-(newline)
-(display (add complex complex))
-(newline)
-
-;; => #<void>
-
-;; (integer . 6)
-;; (rational 9 . 2)
-;; (real . 5.5)
-;; (complex rectangular 5 . 1)
-;; (rational 3 . 1)
-;; (real . 4.0)
-;; (complex rectangular 7/2 . 1)
-;; (real . 5.0)
-;; (complex rectangular 4.5 . 1)
-;; (complex rectangular 4 . 2)
+(drop (make-complex-from-real-imag 3 0))  ; Should return integer 3
+(drop (make-complex-from-real-imag 2.5 0)) ; Should return real 2.5
+(drop (make-real 4.0))                    ; Should return integer 4
+(drop (make-rational 6 2))                ; Should return integer 3
+(add complex-simple complex-simple)
+(add complex-full complex-full)

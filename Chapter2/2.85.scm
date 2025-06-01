@@ -1,3 +1,5 @@
+(use-modules (srfi srfi-1))
+
 (define (square x) (* x x))
 
 ;; Data directed programming - Tagged data
@@ -7,17 +9,15 @@
 (define (type-tag datum)
   (if (pair? datum)
       (car datum)
-      (error "Bad tagged datum: 
-                    TYPE-TAG" datum)))
+      (error "Bad tagged datum: TYPE-TAG" datum)))
 
 (define (contents datum)
   (if (pair? datum)
       (cdr datum)
-      (error "Bad tagged datum: 
-                    CONTENTS" datum)))
+      (error "Bad tagged datum: CONTENTS" datum)))
 
 ;;; Data directed programming - Operation Table
-(define operation-table (make-hash))
+(define operation-table (make-hash-table))
 
 (define (put op types proc)
   (hash-set! operation-table (cons op types) proc))
@@ -25,12 +25,40 @@
 (define (get op types)
   (hash-ref operation-table (cons op types) #f))
 
+;; Type table for tower levels
+(define type-level-table (make-hash-table))
+
+(define (put-type-level type level)
+  (hash-set! type-level-table type level))
+
+(define (get-type-level type)
+  (hash-ref type-level-table type #f))
+
+(define (type-level type)
+  (get-type-level type))
+
+(define (type-higher? type1 type2)
+  (> (type-level type1) (type-level type2)))
+
+(define (highest-type types)
+  (if (null? (cdr types))
+      (car types)
+      (let ((rest-highest (highest-type (cdr types))))
+        (if (type-higher? (car types) rest-highest)
+            (car types)
+            rest-highest))))
+
+;; Forward declarations
+(define (raise arg) (apply-generic 'raise arg))
+(define (equ? x y) (apply-generic 'equ? x y))
+(define (project x) (apply-generic 'project x))
+
+;; Rectangular package
 (define (install-rectangular-package)
   ;; internal procedures
   (define (real-part z) (car z))
   (define (imag-part z) (cdr z))
-  (define (make-from-real-imag x y) 
-    (cons x y))
+  (define (make-from-real-imag x y) (cons x y))
   (define (magnitude z)
     (sqrt (+ (square (real-part z))
              (square (imag-part z)))))
@@ -39,20 +67,18 @@
   (define (make-from-mag-ang r a)
     (cons (* r (cos a)) (* r (sin a))))
   ;; interface to the rest of the system
-  (define (tag x) 
-    (attach-tag 'rectangular x))
+  (define (tag x) (attach-tag 'rectangular x))
   (put 'real-part '(rectangular) real-part)
   (put 'imag-part '(rectangular) imag-part)
   (put 'magnitude '(rectangular) magnitude)
   (put 'angle '(rectangular) angle)
   (put 'make-from-real-imag 'rectangular
-       (lambda (x y) 
-         (tag (make-from-real-imag x y))))
+       (lambda (x y) (tag (make-from-real-imag x y))))
   (put 'make-from-mag-ang 'rectangular
-       (lambda (r a) 
-         (tag (make-from-mag-ang r a))))
+       (lambda (r a) (tag (make-from-mag-ang r a))))
   'done)
 
+;; Polar package
 (define (install-polar-package)
   ;; internal procedures
   (define (magnitude z) (car z))
@@ -72,33 +98,25 @@
   (put 'magnitude '(polar) magnitude)
   (put 'angle '(polar) angle)
   (put 'make-from-real-imag 'polar
-       (lambda (x y) 
-         (tag (make-from-real-imag x y))))
+       (lambda (x y) (tag (make-from-real-imag x y))))
   (put 'make-from-mag-ang 'polar
-       (lambda (r a) 
-         (tag (make-from-mag-ang r a))))
+       (lambda (r a) (tag (make-from-mag-ang r a))))
   'done)
 
-(define (real-part z) 
-  (apply-generic 'real-part z))
-(define (imag-part z) 
-  (apply-generic 'imag-part z))
-(define (magnitude z) 
-  (apply-generic 'magnitude z))
-(define (angle z) 
-  (apply-generic 'angle z))
+;; Generic selectors for complex numbers
+(define (real-part z) (apply-generic 'real-part z))
+(define (imag-part z) (apply-generic 'imag-part z))
+(define (magnitude z) (apply-generic 'magnitude z))
+(define (angle z) (apply-generic 'angle z))
 
-;; Complex
+;; Complex package
 (define (install-complex-package)
-  ;; imported procedures from rectangular 
-  ;; and polar packages
+  ;; imported procedures from rectangular and polar packages
   (define (make-from-real-imag x y)
-    ((get 'make-from-real-imag 
-          'rectangular) 
-     x y))
+    ((get 'make-from-real-imag 'rectangular) x y))
   (define (make-from-mag-ang r a)
-    ((get 'make-from-mag-ang 'polar) 
-     r a))
+    ((get 'make-from-mag-ang 'polar) r a))
+  
   ;; internal procedures
   (define (add-complex z1 z2)
     (make-from-real-imag 
@@ -116,30 +134,31 @@
     (make-from-mag-ang 
      (/ (magnitude z1) (magnitude z2))
      (- (angle z1) (angle z2))))
+
+  (define (tag z) (attach-tag 'complex z))
+
+    ;; Install sub-packages first
+  (install-rectangular-package)
+  (install-polar-package)
+  
   ;; interface to rest of the system
   (put 'real-part '(complex) real-part)
   (put 'imag-part '(complex) imag-part)
   (put 'magnitude '(complex) magnitude)
   (put 'angle '(complex) angle)
-  (define (tag z) (attach-tag 'complex z))
+
   (put 'add '(complex complex)
-       (lambda (z1 z2) 
-         (tag (add-complex z1 z2))))
+       (lambda (z1 z2) (tag (add-complex z1 z2))))
   (put 'sub '(complex complex)
-       (lambda (z1 z2) 
-         (tag (sub-complex z1 z2))))
+       (lambda (z1 z2) (tag (sub-complex z1 z2))))
   (put 'mul '(complex complex)
-       (lambda (z1 z2) 
-         (tag (mul-complex z1 z2))))
+       (lambda (z1 z2) (tag (mul-complex z1 z2))))
   (put 'div '(complex complex)
-       (lambda (z1 z2) 
-         (tag (div-complex z1 z2))))
+       (lambda (z1 z2) (tag (div-complex z1 z2))))
   (put 'make-from-real-imag 'complex
-       (lambda (x y) 
-         (tag (make-from-real-imag x y))))
+       (lambda (x y) (tag (make-from-real-imag x y))))
   (put 'make-from-mag-ang 'complex
-       (lambda (r a) 
-         (tag (make-from-mag-ang r a))))
+       (lambda (r a) (tag (make-from-mag-ang r a))))
   'done)
 
 (define (make-complex-from-real-imag x y)
@@ -148,19 +167,16 @@
 (define (make-complex-from-mag-ang r a)
   ((get 'make-from-mag-ang 'complex) r a))
 
-
+;; Real package
 (define (install-real-package)
   ;; internal procedures  
   (define (make-real n) n)
   
-  (define (add-real x y)
-    (make-real (+  x y)))
-  (define (sub-real x y)
-    (make-real (-  x  y)))
-  (define (mul-real x y)
-    (make-real (*  x  y)))
-  (define (div-real x y)
-    (make-real (/  x  y)))  
+  (define (add-real x y) (make-real (+ x y)))
+  (define (sub-real x y) (make-real (- x y)))
+  (define (mul-real x y) (make-real (* x y)))
+  (define (div-real x y) (make-real (/ x y)))
+  
   ;; interface to rest of the system
   (define (tag x) (attach-tag 'real x))
   (put 'add '(real real)
@@ -178,7 +194,7 @@
 (define (make-real n)
   ((get 'make 'real) n))
 
-;; Rational
+;; Rational package
 (define (install-rational-package)
   ;; internal procedures
   (define (numer x) (car x))
@@ -217,19 +233,16 @@
 (define (make-rational n d)
   ((get 'make 'rational) n d))
 
-;; Integer
+;; Integer package
 (define (install-integer-package)
   ;; internal procedures  
   (define (make-integer n) n)
   
-  (define (add-integer x y)
-    (make-integer (+  x y)))
-  (define (sub-integer x y)
-    (make-integer (-  x  y)))
-  (define (mul-integer x y)
-    (make-integer (*  x  y)))
-  (define (div-integer x y)
-    (make-integer (/  x  y)))  
+  (define (add-integer x y) (make-integer (+ x y)))
+  (define (sub-integer x y) (make-integer (- x y)))
+  (define (mul-integer x y) (make-integer (* x y)))
+  (define (div-integer x y) (make-integer (/ x y)))
+  
   ;; interface to rest of the system
   (define (tag x) (attach-tag 'integer x))
   (put 'add '(integer integer)
@@ -247,48 +260,32 @@
 (define (make-integer n)
   ((get 'make 'integer) n))
 
-;; Raise Ex 2.83
-(define (raise arg)
-  (apply-generic 'raise arg))
-
-;;; Type table
-(define type-level-table	 (make-hash))
-
-(define (put-type-level type level)
-  (hash-set! type-level-table type level))
-
-(define (get-type-level type)
-  (hash-ref type-level-table type #f))
-
-(define (type-level type)
-  (get-type-level type))
-
-(define (type-higher? type1 type2)
-  (> (type-level type1) (type-level type2)))
-
-(define (highest-type types)
-  (if (null? (cdr types))
-      (car types)
-      (let ((rest-highest (highest-type (cdr types))))
-	(if (type-higher? (car types) rest-highest)
-	    (car types)
-	    rest-highest))))
-
-;; Coercion procedurer - successive raise
-(define (coerce arg type)
-  (if (eq? (type-tag arg) type)
-      arg
-      (let ((raised-arg (raise arg)))
-	(if (and raised-arg (eq? (type-tag arg) (type-tag raised-arg)))
-	    #f
-	    (if raised-arg
-		(coerce raised-arg type)
-		#f)))))
-
+;; Utility functions for rational numbers
 (define (numer x) (car x))
 (define (denom x) (cdr x))
 
-;; Put raise procs in the table
+;; Coercion by successive raising
+(define (coerce arg target-type)
+  (if (eq? (type-tag arg) target-type)
+      arg
+      (let ((raised-arg (raise arg)))
+        (if raised-arg
+            (coerce raised-arg target-type)
+            #f))))
+
+;; Install all packages
+(install-complex-package)
+(install-real-package)
+(install-rational-package)
+(install-integer-package)
+
+;; Set up the tower levels
+(put-type-level 'integer 1)
+(put-type-level 'rational 2)
+(put-type-level 'real 3)
+(put-type-level 'complex 4)
+
+;; Install raise operations
 (put 'raise '(integer)
      (lambda (arg) (make-rational arg 1)))
 
@@ -298,80 +295,76 @@
 (put 'raise '(real)
      (lambda (arg) (make-complex-from-real-imag arg 0)))
 
-;; Install numbers packages
-(install-rectangular-package)
-(install-polar-package)
-(install-complex-package)
-(install-real-package)
-(install-rational-package)
-(install-integer-package)
+;; Install equality operations
+(put 'equ? '(integer integer) =)
+(put 'equ? '(real real) =)
+(put 'equ? '(rational rational)
+     (lambda (x y) (and (= (numer x) (numer y))
+                        (= (denom x) (denom y)))))
+(put 'equ? '(complex complex)
+     (lambda (x y) (and (= (real-part x) (real-part y))
+                        (= (imag-part x) (imag-part y)))))
 
-;; construct tower
-(put-type-level 'integer 1)
-(put-type-level 'rational 2)
-(put-type-level 'real 3)
-(put-type-level 'complex 4)
+;; Install project operations
+(put 'project '(complex)
+     (lambda (z) (make-real (real-part z))))
 
-(define (apply-generic op . args)
-  (let ((type-tags (map type-tag args)))
-    (let ((proc (get op type-tags)))
-      (if proc
-          (apply proc (map contents args))
-	  (if (null? (cdr args))
-	      (car args)
-	      (let ((highest-type-tag (highest-type type-tags)))
-		(let ((coerced-args 
-		       (map (lambda (obj) 
-			      (coerce obj highest-type-tag))
-			    args)))
-		  (if (andmap identity coerced-args)
-		      (apply apply-generic 
-			     (cons op coerced-args))
-		      (error "Could not coerce args" 
-			     (list op type-tags))))))))))
+(put 'project '(real)
+     (lambda (r) (make-rational (inexact->exact (round r)) 1)))
 
-;; Numbers
+(put 'project '(rational)
+     (lambda (r) (make-integer (inexact->exact (round (/ (numer r) (denom r)))))))
+
+;; Drop procedure
+(define (drop obj)
+  (let ((proj-proc (get 'project (list (type-tag obj)))))
+    (if proj-proc
+        (let ((projected-obj (proj-proc (contents obj))))
+          (if projected-obj
+              (let ((raised-back (raise projected-obj)))
+                (if (and raised-back (equ? obj raised-back))
+                    (drop projected-obj)  ; Recursively drop further
+                    obj))                 ; Can't drop, return original
+              obj))                       ; No projection possible
+        obj)))                            ; No project operation
+
+;; Generic arithmetic operations
 (define (add x y) (apply-generic 'add x y))
 (define (sub x y) (apply-generic 'sub x y))
 (define (mul x y) (apply-generic 'mul x y))
 (define (div x y) (apply-generic 'div x y))
 
-;; test cases
+;; CORRECTED apply-generic with drop
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (let ((result (apply proc (map contents args))))
+            ;; Apply drop to simplify the result, but only for arithmetic operations
+            (if (memq op '(add sub mul div))
+                (drop result)
+                result))
+          ;; Coercion logic for when direct operation not found
+          (if (= (length args) 1)
+              (car args)  ; Single argument, return as-is
+              (let ((highest-type-tag (highest-type type-tags)))
+                (let ((coerced-args 
+                       (map (lambda (obj) (coerce obj highest-type-tag)) args)))
+                  (if (every identity coerced-args)
+                      (apply apply-generic (cons op coerced-args))
+                      (error "Could not coerce args" (list op type-tags))))))))))
+
+;; Test cases
 (define int (make-integer 3))
 (define rat (make-rational 3 2))
 (define real (make-real 2.5))
-(define complex  (make-complex-from-real-imag 2 1))
+(define complex-simple (make-complex-from-real-imag 2 0))  ; Can be dropped to real
+(define complex-full (make-complex-from-real-imag 2 1))    ; Cannot be dropped
 
-(display (add int int))
-(newline)
-(display (add int rat))
-(newline)
-(display (add int real))
-(newline)
-(display (add int complex))
-(newline)
-(display (add rat rat))
-(newline)
-(display (add rat real))
-(newline)
-(display (add rat complex))
-(newline)
-(display (add real real))
-(newline)
-(display (add real complex))
-(newline)
-(display (add complex complex))
-(newline)
-
-;; => #<void>
-
-;; (integer . 6)
-;; (rational 9 . 2)
-;; (real . 5.5)
-;; (complex rectangular 5 . 1)
-;; (rational 3 . 1)
-;; (real . 4.0)
-;; (complex rectangular 7/2 . 1)
-;; (real . 5.0)
-;; (complex rectangular 4.5 . 1)
-;; (complex rectangular 4 . 2)
+;; Examples of drop in action:
+(drop (make-complex-from-real-imag 3 0))  ; Should return integer 3
+(drop (make-complex-from-real-imag 2.5 0)) ; Should return real 2.5
+(drop (make-real 4.0))                    ; Should return integer 4
+(drop (make-rational 6 2))                ; Should return integer 3
+(add complex-simple complex-simple)
+(add complex-full complex-full)
