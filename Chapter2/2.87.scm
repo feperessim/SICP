@@ -68,17 +68,15 @@
   (define (order term) (car term))
   (define (coeff term) (cadr term))
   (define (=zero-poly? p)
-    (if (empty-termlist? (term-list p))
-        #t
+    (or (empty-termlist? (term-list p))
         (and (=zero? (coeff
                       (first-term
                        (term-list p))))
-             (=zero? (tag
-                      (make-poly
-                       (variable p)
-                       (rest-terms
-                        (term-list p))))))))
-  
+             (=zero-poly?
+              (make-poly
+               (variable p)
+               (rest-terms
+                (term-list p)))))))
   (define (add-poly p1 p2)
     (if (same-variable? (variable p1)
                         (variable p2))
@@ -115,8 +113,6 @@
                      (add-terms
                       (rest-terms L1)
                       (rest-terms L2)))))))))
-                
-  
   (define (mul-poly p1 p2)
     (if (same-variable? (variable p1)
                         (variable p2))
@@ -127,7 +123,6 @@
         (error "Polys not in same var:
               MUL-POLY"
                (list p1 p2))))
-  
   (define (mul-terms L1 L2)
     (if (empty-termlist? L1)
         (the-empty-termlist)
@@ -135,7 +130,6 @@
          (mul-term-by-all-terms 
           (first-term L1) L2)
          (mul-terms (rest-terms L1) L2))))
-  
   (define (mul-term-by-all-terms t1 L)
     (if (empty-termlist? L)
         (the-empty-termlist)
