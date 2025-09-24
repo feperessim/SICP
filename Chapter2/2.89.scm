@@ -1,3 +1,5 @@
+(use-modules (srfi srfi-1))
+
 (define operation-table (make-hash-table))
 
 (define (put op types proc)
@@ -19,15 +21,74 @@
       (cdr datum)
       (error "Bad tagged datum: CONTENTS" datum)))
 
+(define type-level-table (make-hash-table))
+
+(define (put-type-level type level)
+  (hash-set! type-level-table type level))
+
+(define (get-type-level type)
+  (hash-ref type-level-table type #f))
+
+(define (type-level type)
+  (get-type-level type))
+
+(define (type-higher? type1 type2)
+  (> (type-level type1) (type-level type2)))
+
+(define (highest-type types)
+  (if (null? (cdr types))
+      (car types)
+      (let ((rest-highest (highest-type (cdr types))))
+        (if (type-higher? (car types) rest-highest)
+            (car types)
+            rest-highest))))
+
+(define (raise arg) (apply-generic 'raise arg))
+(define (equ? x y) (apply-generic 'equ? x y))
+(define (project x) (apply-generic 'project x))
+
+;; Coercion by successive raising
+(define (coerce arg target-type)
+  (if (eq? (type-tag arg) target-type)
+      arg
+      (let ((raised-arg (raise arg)))
+        (if raised-arg
+            (coerce raised-arg target-type)
+            #f))))
+
+;; Drop procedure
+(define (drop obj)
+  (let ((proj-proc (get 'project (list (type-tag obj)))))
+    (if proj-proc
+        (let ((projected-obj (proj-proc (contents obj))))
+          (if projected-obj
+              (let ((raised-back (raise projected-obj)))
+                (if (and raised-back (equ? obj raised-back))
+                    (drop projected-obj)  ; Recursively drop further
+                    obj))                 ; Can't drop, return original
+              obj))                       ; No projection possible
+        obj)))                            ; No project operation
+
+
+;; apply-generic with drop
 (define (apply-generic op . args)
   (let ((type-tags (map type-tag args)))
     (let ((proc (get op type-tags)))
       (if proc
-          (apply proc (map contents args))
-          (error
-           "No method for these types:
-           APPLY-GENERIC"
-           (list op type-tags))))))
+          (let ((result (apply proc (map contents args))))
+            ;; Apply drop to simplify the result, but only for arithmetic operations
+            (if (memq op '(add sub mul div))
+                (drop result)
+	      result))
+          ;; Coercion logic for when direct operation not found
+          (if (= (length args) 1)
+              (car args)  ; Single argument, return as-is
+              (let ((highest-type-tag (highest-type type-tags)))
+                (let ((coerced-args 
+                       (map (lambda (obj) (coerce obj highest-type-tag)) args)))
+                  (if (every identity coerced-args)
+                      (apply apply-generic (cons op coerced-args))
+                      (error "Could not coerce args" (list op type-tags))))))))))
 
 (define (install-scheme-number-package)
   (define (tag x) (attach-tag 'scheme-number x))
@@ -43,6 +104,7 @@
        (lambda (x) (tag (- x))))
   (put 'sub '(scheme-number scheme-number)
        (lambda (x y) (add (tag x) (negate (tag y)))))
+  (put 'equ? '(scheme-number scheme-number) =)
   'done)
 
 (define (install-polynomial-package)
@@ -65,8 +127,7 @@
                  order
                  (+ current-length 1))))))
   (define (adjoin-term term term-list)
-    (cond 
-          ((< (order term) (length term-list))
+    (cond ((< (order term) (length term-list))
            (error "Term order <= term-list:
                   ADJOIN TERM"))
           (else           
@@ -173,7 +234,18 @@
             (negate (coeff t)))
            (negate-terms (rest-terms L))))))
   (define (sub-poly p1 p2)
-      (tag (add-poly p1 (negate-poly p2))))    
+    (tag (add-poly p1 (negate-poly p2))))
+  (define (equ-poly? p1 p2)
+    (and (same-variable? (variable p1) (variable p2))
+         (equ-termlist? (term-list p1) (term-list p2))))
+  (define (equ-termlist? L1 L2)
+    (cond ((and (empty-termlist? L1) (empty-termlist? L2)) #t)
+          ((or  (empty-termlist? L1) (empty-termlist? L2)) #f)
+          (else
+           (and (= (order (first-term L1)) (order (first-term L2)))
+                (equ? (coeff (first-term L1))
+                      (coeff (first-term L2)))
+                (equ-termlist? (rest-terms L1) (rest-terms L2))))))
   ;; interface to rest of the system
   (define (tag p) (attach-tag 'polynomial p))
   (put 'add '(polynomial polynomial)
@@ -193,6 +265,7 @@
        (lambda (p) (tag (negate-poly p))))
   (put 'sub '(polynomial polynomial)
        (lambda (p1 p2) (sub-poly p1 p2)))
+  (put 'equ? '(polynomial polynomial) equ-poly?)
   'done)
 
 (define (make-polynomial var terms)
@@ -216,6 +289,18 @@
 ;; test cases
 (install-scheme-number-package)
 (install-polynomial-package)
+
+;; Set up the tower levels
+(put-type-level 'scheme-number 1)
+(put-type-level 'polynomial 2)
+
+;; Install raise operations
+(put 'raise '(scheme-number)
+     (lambda (arg) (make-polynomial 'y (list (make-scheme-number arg)))))
+
+;; Install project operations
+(put 'project '(polynomial)
+     (lambda (z) (make-scheme-number (car z))))
 
 (define poly-x
   (make-polynomial 'x
@@ -276,6 +361,6 @@
 (display (sub poly-x poly-y))
 (newline)
 (display (sub poly-x poly-w))
+(newline) 
+(display (sub poly-k poly-h))
 (newline)
-;(display (sub poly-k poly-h))
- 
