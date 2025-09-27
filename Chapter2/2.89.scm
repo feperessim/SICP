@@ -121,9 +121,9 @@
     (let ((size (- order current-length)))
       (if (= size 0)
           (list coeff)
-          (cons (make-scheme-number 0)
+          (cons coeff
                 (make-term-list-with-zeros
-                 coeff
+                 (make-scheme-number 0)
                  order
                  (+ current-length 1))))))
   (define (adjoin-term term term-list)
@@ -312,6 +312,11 @@
                    (list (make-scheme-number 4)
                          (make-scheme-number 3)
                          (make-scheme-number 2))))
+(define poly-u
+  (make-polynomial 'x
+                   (list (make-scheme-number 4)
+                         (make-scheme-number 3))))
+
 (define poly-w
   (make-polynomial 'x
                    (list (make-scheme-number 1)
@@ -363,4 +368,10 @@
 (display (sub poly-x poly-w))
 (newline) 
 (display (sub poly-k poly-h))
+(newline)
+(display (mul poly-x poly-y))
+(newline)
+(display (mul poly-x poly-u))
+(newline)
+(display (mul poly-x poly-empty))
 (newline)
