@@ -79,7 +79,7 @@
             ;; Apply drop to simplify the result, but only for arithmetic operations
             (if (memq op '(add sub mul div))
                 (drop result)
-	      result))
+	        result))
           ;; Coercion logic for when direct operation not found
           (if (= (length args) 1)
               (car args)  ; Single argument, return as-is
@@ -127,7 +127,8 @@
                  order
                  (+ current-length 1))))))
   (define (adjoin-term term term-list)
-    (cond ((< (order term) (length term-list))
+    (cond ((=zero? (coeff term)) term-list)
+          ((< (order term) (length term-list))
            (error "Term order <= term-list:
                   ADJOIN TERM"))
           (else           
@@ -295,12 +296,35 @@
 (put-type-level 'polynomial 2)
 
 ;; Install raise operations
+;; This is problematic for when the polynomial is in a different variable
 (put 'raise '(scheme-number)
-     (lambda (arg) (make-polynomial 'y (list (make-scheme-number arg)))))
+     (lambda (arg) (make-polynomial 'x (list (make-scheme-number arg)))))
 
 ;; Install project operations
 (put 'project '(polynomial)
      (lambda (z) (make-scheme-number (car z))))
+
+;; Test suit
+;; Assertion helper
+(define (assert-equal actual expected message)
+  (if (eq? actual expected)
+      (display (string-append "PASS: " message "\n"))
+      (begin
+        (display (string-append "FAIL: " message "\n"))
+        (display "Expected: ") (display expected) (newline)
+        (display "Actual: ") (display actual) (newline))))
+
+(define (assert-equ actual expected message)
+  (if (equ? actual expected)
+      (display (string-append "PASS: " message "\n"))
+      (begin
+        (display (string-append "FAIL: " message "\n"))
+        (display "Expected: ") (display expected) (newline)
+        (display "Actual: ") (display actual) (newline))))
+
+;; Convenience constructors
+(define (num n) (make-scheme-number n))
+(define (poly terms) (make-polynomial 'x terms))
 
 (define poly-x
   (make-polynomial 'x
@@ -329,49 +353,90 @@
                          (make-scheme-number 0)
                          (make-scheme-number 0))))
 (define poly-g
-  (make-polynomial 'y
+  (make-polynomial 'x
                    (list (make-scheme-number 4)
                          (make-scheme-number 3)
-                         (make-scheme-number 2)
+                         (make-scheme-number 0)
                          (make-scheme-number 1))))
-
-(define poly-k
-  (make-polynomial 'x
-                   (list poly-g
-                         (make-scheme-number 2)
-                         (make-scheme-number 1))))
-
-(define poly-h
-  (make-polynomial 'x
-                   (list poly-g)))
-
 
 (define poly-empty (make-polynomial 'x '()))
 
-(display (negate (make-scheme-number 2)))
-(display (negate poly-x))
-(newline)
-(display (negate poly-y))
-(newline)
-(display (sub poly-x poly-empty))
-(newline)
-(display (sub poly-empty poly-x))
-(newline)
-(display (sub poly-x poly-empty))
-(newline)
-(display (sub poly-empty poly-x))
-(newline)
-(display (sub poly-x poly-x))
-(newline)
-(display (sub poly-x poly-y))
-(newline)
-(display (sub poly-x poly-w))
-(newline) 
-(display (sub poly-k poly-h))
-(newline)
-(display (mul poly-x poly-y))
-(newline)
-(display (mul poly-x poly-u))
-(newline)
-(display (mul poly-x poly-empty))
-(newline)
+
+;; 1. Negation tests
+(assert-equ (negate (num 2))
+            (num -2)
+            "Negate scheme-number")
+
+(assert-equ (negate poly-y) 
+            (poly (list (num -4) (num -3) (num -2)))
+            "Negate poly-y")
+
+(assert-equ (negate poly-zero)
+            poly-empty
+            "Negate poly-zero produces empty polynomial")
+
+;; 2. Addition tests
+(assert-equ (add poly-x poly-zero)
+            poly-x
+            "Add poly-x to poly-zero produces poly-x")
+
+(assert-equ (add poly-x poly-empty)
+            poly-x
+            "Add poly-x to poly-empty produces poly-x")
+
+(assert-equ (add poly-x poly-x)
+            (poly (list (num 6) (num 4) (num 2)))
+            "Add poly-x to itself produces 2 timex poly-x")
+
+(assert-equ (add poly-x poly-w)
+            (poly (list (num 4) (num 3) (num 1)))
+            "Add poly-x to poly-w")
+
+(assert-equ (add poly-x poly-g)
+            (poly (list (num 4) (num 6) (num 2) (num 2)))
+            "Add poly-x to poly-g")
+
+;; 3. Subtraction tests
+(assert-equ (sub poly-x poly-zero)
+            poly-x
+            "Subtract poly-x from poly-zero produces poly-x")
+
+(assert-equ (sub poly-x poly-empty)
+            poly-x
+            "Subtract poly-x from poly-empty produces poly-x")
+
+(assert-equ (sub poly-x poly-x)
+            poly-empty
+            "Subtract poly-x from itself produces empty polynomial")
+
+(assert-equ (sub poly-x poly-w)
+            (poly (list (num 2) (num 1) (num 1)))
+            "Subtract poly-w from poly-x")
+
+(assert-equ (sub poly-w poly-x)
+            (poly (list (num -2) (num -1) (num -1)))
+            "Subtract poly-x from poly-w")
+
+
+;; 4. Multiplication tests
+(assert-equ (mul poly-x poly-y)
+            (poly (list (num 12) (num 17) (num 16) (num 7) (num 2)))
+            "Multiply poly-x by poly-y")
+
+(assert-equ (mul poly-x poly-u)
+            (poly (list (num 12) (num 17) (num 10) (num 3)))
+            "Multiply poly-x by poly-u")
+
+(assert-equ (mul poly-x poly-empty)
+            poly-empty
+            "Multiply poly-x by empty polynomial produces empty polynomial")
+
+(assert-equ (mul poly-x poly-zero)
+            poly-empty
+            "Multiply poly-x by zero polynomial produces empty polynomial")
+
+
+;; 5. =zero? tests
+(assert-equal (=zero? poly-empty) #t "poly-empty is zero")
+(assert-equal (=zero? poly-x) #f "poly-x is not zero")
+(assert-equal (=zero? (negate poly-zero)) #t "negate poly-zero is zero")
