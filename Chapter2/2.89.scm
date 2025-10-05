@@ -109,7 +109,12 @@
 
 (define (install-polynomial-package)
   (define (make-poly variable term-list)
-    (cons variable term-list))
+    (define (remove-leading-zeros term-list)
+      (cond ((empty-termlist? term-list) (the-empty-termlist))
+            ((=zero? (coeff (first-term term-list)))
+             (remove-leading-zeros (rest-terms term-list)))
+            (else term-list)))             
+    (cons variable (remove-leading-zeros term-list)))
   (define (variable p) (car p))
   (define (term-list p) (cdr p))
   (define (variable? x) (symbol? x))
@@ -150,14 +155,7 @@
   (define (order term) (car term))
   (define (coeff term) (cadr term))
   (define (=zero-poly? p)
-    (or (empty-termlist? (term-list p))
-        (and (=zero? (coeff
-                      (first-term
-                       (term-list p))))
-             (=zero-poly? (make-poly
-                           (variable p)
-                           (rest-terms
-                            (term-list p)))))))
+    (empty-termlist? (term-list p)))
   (define (add-poly p1 p2)
     (if (same-variable? (variable p1)
                         (variable p2))
@@ -302,7 +300,10 @@
 
 ;; Install project operations
 (put 'project '(polynomial)
-     (lambda (z) (make-scheme-number (car z))))
+     (lambda (z)
+       (if (null? (cdr z))
+           (make-scheme-number 0)
+           (cadr z))))
 
 ;; Test suit
 ;; Assertion helper
@@ -386,7 +387,7 @@
 
 (assert-equ (add poly-x poly-x)
             (poly (list (num 6) (num 4) (num 2)))
-            "Add poly-x to itself produces 2 timex poly-x")
+            "Add poly-x to itself produces 2 time poly-x")
 
 (assert-equ (add poly-x poly-w)
             (poly (list (num 4) (num 3) (num 1)))
