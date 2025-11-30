@@ -191,11 +191,9 @@
 
 
 (define (install-polynomial-package)
-;;  (define (make-poly variable term-list)
-  ;;  (cons variable term-list))
   (define (make-poly variable term-list)
     (define (remove-leading-zeros tl)
-      (cond ((empty-termlist? tl) tl)  ; ← Retorna a própria lista vazia (com tag)
+      (cond ((empty-termlist? tl) tl)
             ((=zero? (coeff (first-term tl)))
              (remove-leading-zeros (rest-terms tl)))
             (else tl)))             
@@ -208,7 +206,6 @@
          (variable? v2)
          (eq? v1 v2)))
   (define (adjoin-term term term-list)
-  ;; term não tem tag, apenas term-list tem
     (let ((proc (get 'adjoin-term (list (type-tag term-list)))))
       (if proc
           (proc term (contents term-list))
