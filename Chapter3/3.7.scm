@@ -17,7 +17,6 @@
   dispatch)
 
 (define (make-joint acc first-pw second-pw)
-  (acc first-pw 'withdraw)
   (define (dispatch p m)
     (if (eq? second-pw p)
         (acc first-pw m)
